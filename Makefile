@@ -13,7 +13,7 @@ CXXFLAGS = -O3 -std=c++17 -Wall -Wextra $(INCLUDES)
 NVCCFLAGS = -O3 -std=c++17 $(NVCC_ARCH) -Xcompiler "-Wall -Wextra" $(INCLUDES)
 
 # linkage 
-LDFLAGS = -lX11 -lpthread
+LDFLAGS = -lX11 -lpthread -ljpeg
 
 # Directorios
 SRC_DIR = src

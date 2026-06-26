@@ -1,7 +1,7 @@
 #include "../inc/dataloader.hpp"
 
 DataLoader::DataLoader(int num_images, const std::string& dataset_dir, int target_width, int target_height)
-    : num_images(num_images), dataset_dir(dataset_dir), 
+    : dataset_dir(dataset_dir), num_images(num_images),
       target_width(target_width), target_height(target_height), is_loaded(false) {
     
     elements_per_image = target_width * target_height;
