@@ -36,7 +36,7 @@ void DataLoader::preprocess_data() {
         gray_img.resize(target_width, target_height, -100, -100, 5); // 5 es bicubic interpolation
 
         // Populamos el dataset
-        size_t offset = static_cast<size_t>(k) * elements_per_image;
+        size_t offset = static_cast<size_t>(k - 1) * elements_per_image;
         float* current_image_ptr = h_dataset + offset;
 
         cimg_forXY(gray_img, x, y) {
