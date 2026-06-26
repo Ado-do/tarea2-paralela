@@ -5,26 +5,32 @@ CXX = g++
 # Arquitectura GPU
 NVCC_ARCH = 
 
-CXXFLAGS = -O3 -std=c++17 -Wall -Wextra
-NVCCFLAGS = -O3 -std=c++17 $(NVCC_ARCH) -Xcompiler "-Wall -Wextra"
+# Flags e Includes
+# Añadimos -Iinc y -Ithird_party para que encuentre los .hpp y dependencias
+INCLUDES = -Iinc -Ithird_party
+CXXFLAGS = -O3 -std=c++17 -Wall -Wextra $(INCLUDES)
+NVCCFLAGS = -O3 -std=c++17 $(NVCC_ARCH) -Xcompiler "-Wall -Wextra" $(INCLUDES)
 
 # linkage 
 LDFLAGS = -lX11 -lpthread
 
-# Directorio
-SRC_DIR = .
+# Directorios
+SRC_DIR = src
+INC_DIR = inc
 OBJ_DIR = obj
 BIN_DIR = bin
 
 # Ejecutable
 TARGET = $(BIN_DIR)/main
 
-# Automáticamente reconode todos los .cpp en SRC_DIR
+# Automáticamente reconoce todos los .cpp y .cu en SRC_DIR
 CPP_SOURCES = $(wildcard $(SRC_DIR)/*.cpp)
+CU_SOURCES = $(wildcard $(SRC_DIR)/*.cu)
 
 # Los mappea a object files
 CPP_OBJECTS = $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(CPP_SOURCES))
-OBJECTS = $(CPP_OBJECTS) 
+CU_OBJECTS = $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/%.o, $(CU_SOURCES))
+OBJECTS = $(CPP_OBJECTS) $(CU_OBJECTS) 
 
 # Reglas de building
 .PHONY: all prep clean run
@@ -40,7 +46,7 @@ prep:
 $(TARGET): $(OBJECTS)
 	$(NVCC) $(NVCCFLAGS) -o $@ $^ $(LDFLAGS)
 
-# Compilamos
+# Compilamos .cpp
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
