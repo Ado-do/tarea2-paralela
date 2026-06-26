@@ -7,7 +7,8 @@ NVCC_ARCH =
 
 # Flags e Includes
 # Añadimos -Iinc y -Ithird_party para que encuentre los .hpp y dependencias
-INCLUDES = -Iinc -Ithird_party
+CUDA_PATH = /usr/local/cuda
+INCLUDES = -Iinc -Ithird_party -I$(CUDA_PATH)/include
 CXXFLAGS = -O3 -std=c++17 -Wall -Wextra $(INCLUDES)
 NVCCFLAGS = -O3 -std=c++17 $(NVCC_ARCH) -Xcompiler "-Wall -Wextra" $(INCLUDES)
 
