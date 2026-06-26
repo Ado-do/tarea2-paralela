@@ -7,6 +7,7 @@
 
 #define cimg_display 0
 #define cimg_use_jpeg
+#define cimg_use_png
 #include "../third_party/CImg/CImg.h"
 
 using namespace cimg_library;
