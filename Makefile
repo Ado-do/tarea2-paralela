@@ -6,7 +6,6 @@ CXX = g++
 NVCC_ARCH = 
 
 # Flags e Includes
-# Añadimos -Iinc y -Ithird_party para que encuentre los .hpp y dependencias
 CUDA_PATH = /usr/local/cuda
 INCLUDES = -Iinc -Ithird_party -I$(CUDA_PATH)/include
 CXXFLAGS = -O3 -std=c++17 -Wall -Wextra $(INCLUDES)
@@ -21,30 +20,43 @@ INC_DIR = inc
 OBJ_DIR = obj
 BIN_DIR = bin
 
-# Ejecutable
-TARGET = $(BIN_DIR)/main
+# Ejecutables
+TEST_TARGET = $(BIN_DIR)/tests
+BENCH_TARGET = $(BIN_DIR)/benchmark
 
-# Automáticamente reconoce todos los .cpp y .cu en SRC_DIR
-CPP_SOURCES = $(wildcard $(SRC_DIR)/*.cpp)
-CU_SOURCES = $(wildcard $(SRC_DIR)/*.cu)
+# Common sources (excluimos los main)
+COMMON_CPP = $(SRC_DIR)/dataloader.cpp
+COMMON_CU  = $(SRC_DIR)/kernels.cu
 
-# Los mappea a object files
-CPP_OBJECTS = $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(CPP_SOURCES))
-CU_OBJECTS = $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/%.o, $(CU_SOURCES))
-OBJECTS = $(CPP_OBJECTS) $(CU_OBJECTS) 
+# Mains
+TEST_MAIN = $(SRC_DIR)/tests.cpp
+FINAL_MAIN = $(SRC_DIR)/benchmark.cpp
+
+# Objects
+COMMON_OBJ = $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(COMMON_CPP)) \
+             $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/%.o, $(COMMON_CU))
+TEST_OBJ = $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(TEST_MAIN))
+FINAL_OBJ = $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(FINAL_MAIN))
 
 # Reglas de building
-.PHONY: all prep clean run
+.PHONY: all prep clean tests benchmark
 
 # Default target
-all: prep $(TARGET)
+all: prep $(TEST_TARGET) $(BENCH_TARGET)
 
-# Ensure build directories exist
+# Asegurar que los directorios existen
 prep:
 	@mkdir -p $(OBJ_DIR) $(BIN_DIR)
 
-# Linkeamos objetos
-$(TARGET): $(OBJECTS)
+tests: $(TEST_TARGET)
+benchmark: $(BENCH_TARGET)
+
+# Linkeamos ejecutable de tests
+$(TEST_TARGET): $(COMMON_OBJ) $(TEST_OBJ)
+	$(NVCC) $(NVCCFLAGS) -o $@ $^ $(LDFLAGS)
+
+# Linkeamos ejecutable de pruebas finales (benchmark)
+$(BENCH_TARGET): $(COMMON_OBJ) $(FINAL_OBJ)
 	$(NVCC) $(NVCCFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Compilamos .cpp
