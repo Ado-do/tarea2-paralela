@@ -5,7 +5,7 @@
 int main (int argc, char *argv[]) {
 
     const int num_images = 100;
-    const std::string dataset_dir = "data";
+    const std::string dataset_dir = "data/DIV2K_valid_LR_bicubic_X4";
     const int target_width = 128;
     const int target_height = 128;
 
