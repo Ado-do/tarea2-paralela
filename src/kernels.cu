@@ -89,6 +89,73 @@ __global__ void compute_covariance_tiled_kernel(float* d_dataset, float* d_cov,
     }
 }
 
+// -------------------------------------------------------------------------
+// KERNELS PARA EL EXPERIMENTO 2 (BATCHES)
+// -------------------------------------------------------------------------
+
+// Suma el promedio parcial de un lote al vector promedio global
+__global__ void accumulate_average_kernel(float* d_dataset_batch, float* d_avg, 
+                                          int batch_images, int n) {
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    if (j >= n) return;
+
+    float sum = 0.0f;
+    for (int k = 0; k < batch_images; k++) {
+        sum += d_dataset_batch[k * n + j];
+    }
+    // Atómico para evitar colisiones si varios streams terminan al mismo tiempo
+    atomicAdd(&d_avg[j], sum);
+}
+
+// Divide el vector promedio global por el total de imágenes (Se ejecuta 1 sola vez)
+__global__ void divide_average_kernel(float* d_avg, int total_images, int n) {
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    if (j >= n) return;
+    d_avg[j] /= (float)total_images;
+}
+
+// Calcula la covarianza de un lote y la suma a la matriz de covarianza global
+__global__ void accumulate_covariance_tiled_kernel(float* d_dataset_batch, float* d_cov,
+                                                   int batch_images, int total_images, int n) {
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+    int row = blockIdx.y * blockDim.y + ty;
+    int col = blockIdx.x * blockDim.x + tx;
+
+    float sum = 0.0f;
+    int num_tiles = (batch_images + TILE_SIZE - 1) / TILE_SIZE;
+
+    for (int m_step = 0; m_step < num_tiles; ++m_step) {
+        __shared__ float s_A[TILE_SIZE][TILE_SIZE];
+        __shared__ float s_B[TILE_SIZE][TILE_SIZE];
+
+        int k_A = m_step * TILE_SIZE + tx; 
+        if (row < n && k_A < batch_images) {
+            s_A[ty][tx] = d_dataset_batch[k_A * n + row];
+        } else {
+            s_A[ty][tx] = 0.0f;
+        }
+
+        int k_B = m_step * TILE_SIZE + ty; 
+        if (col < n && k_B < batch_images) {
+            s_B[ty][tx] = d_dataset_batch[k_B * n + col];
+        } else {
+            s_B[ty][tx] = 0.0f;
+        }
+        __syncthreads();
+
+        for (int i = 0; i < TILE_SIZE; ++i) {
+            sum += s_A[ty][i] * s_B[i][tx];
+        }
+        __syncthreads(); 
+    }
+
+    if (row < n && col < n) {
+        // Suma atómica a la matriz final
+        atomicAdd(&d_cov[row * n + col], sum / (float)total_images);
+    }
+}
+
 // Función para verificar la correctitud en CPU
 void verify_correctness_cpu(float* h_dataset_orig, float* h_cov_gpu,
                             int num_images, int n) {
@@ -239,6 +306,115 @@ void run_experiment_1(float* h_dataset, int num_images, int n,
 
     // Liberar recursos
     cudaFree(d_dataset);
+    cudaFree(d_avg);
+    cudaFree(d_cov);
+    free(h_cov);
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+}
+
+// Implementación del Experimento 2 (CUDA Streams y Pipelining)
+void run_experiment_2(float* h_dataset, int num_images, int n, 
+                      int batch_size, int num_streams, bool check_correctness) {
+    
+    size_t avg_bytes = n * sizeof(float);
+    size_t cov_bytes = (size_t)n * n * sizeof(float);
+
+    float *d_avg, *d_cov;
+    float* h_cov = (float*)malloc(cov_bytes);
+
+    // Asignar memoria para resultados globales e inicializar en 0 (vital para atomicAdd)
+    cudaMalloc((void**)&d_avg, avg_bytes);
+    cudaMemset(d_avg, 0, avg_bytes);
+    cudaMalloc((void**)&d_cov, cov_bytes);
+    cudaMemset(d_cov, 0, cov_bytes);
+
+    // Crear arreglo de streams y buffers por stream
+    cudaStream_t streams[num_streams];
+    float* d_dataset_batch[num_streams];
+    size_t batch_bytes = batch_size * n * sizeof(float);
+
+    for (int i = 0; i < num_streams; ++i) {
+        cudaStreamCreate(&streams[i]);
+        cudaMalloc((void**)&d_dataset_batch[i], batch_bytes);
+    }
+
+    int num_batches = (num_images + batch_size - 1) / batch_size;
+    
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+
+    // ==========================================
+    // PASADA 1: Calcular vector promedio global
+    // ==========================================
+    int block_size = 256;
+    int grid_size_n = (n + block_size - 1) / block_size;
+
+    for (int i = 0; i < num_batches; ++i) {
+        int s = i % num_streams;
+        int current_batch = min(batch_size, num_images - i * batch_size);
+        size_t current_bytes = current_batch * n * sizeof(float);
+        int offset = i * batch_size * n;
+
+        // Copia Asíncrona (Pipelining)
+        cudaMemcpyAsync(d_dataset_batch[s], h_dataset + offset, current_bytes, cudaMemcpyHostToDevice, streams[s]);
+        // Cómputo asíncrono en el stream 's'
+        accumulate_average_kernel<<<grid_size_n, block_size, 0, streams[s]>>>(d_dataset_batch[s], d_avg, current_batch, n);
+    }
+    cudaDeviceSynchronize(); // Esperar a que todos los lotes sumen sus promedios
+
+    // Dividir entre el total de imágenes (Stream 0 por defecto)
+    divide_average_kernel<<<grid_size_n, block_size>>>(d_avg, num_images, n);
+    cudaDeviceSynchronize();
+
+    // ==========================================
+    // PASADA 2: Centrado y Matriz de Covarianza
+    // ==========================================
+    dim3 block_cov(TILE_SIZE, TILE_SIZE);
+    dim3 grid_cov((n + TILE_SIZE - 1) / TILE_SIZE, (n + TILE_SIZE - 1) / TILE_SIZE);
+
+    for (int i = 0; i < num_batches; ++i) {
+        int s = i % num_streams;
+        int current_batch = min(batch_size, num_images - i * batch_size);
+        size_t current_bytes = current_batch * n * sizeof(float);
+        int offset = i * batch_size * n;
+        int grid_size_center = (current_batch * n + block_size - 1) / block_size;
+
+        cudaMemcpyAsync(d_dataset_batch[s], h_dataset + offset, current_bytes, cudaMemcpyHostToDevice, streams[s]);
+        
+        // Reutilizamos el kernel original, pasándole la cantidad de imágenes del lote y el Stream 's'
+        center_data_kernel<<<grid_size_center, block_size, 0, streams[s]>>>(d_dataset_batch[s], d_avg, current_batch, n);
+        
+        // Covarianza acumulativa
+        accumulate_covariance_tiled_kernel<<<grid_cov, block_cov, 0, streams[s]>>>(d_dataset_batch[s], d_cov, current_batch, num_images, n);
+    }
+    cudaDeviceSynchronize(); // Sincronización final
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    
+    float time_total = 0;
+    cudaEventElapsedTime(&time_total, start, stop);
+
+    // ==========================================
+    // RESULTADO FINAL
+    // ==========================================
+    cudaMemcpy(h_cov, d_cov, cov_bytes, cudaMemcpyDeviceToHost);
+
+    cout << "[METRICAS_EXP2]," << num_images << "," << batch_size << "," << num_streams << "," << time_total << endl;
+
+    if (check_correctness) {
+        verify_correctness_cpu(h_dataset, h_cov, num_images, n);
+    }
+
+    // Liberar recursos
+    for (int i = 0; i < num_streams; ++i) {
+        cudaFree(d_dataset_batch[i]);
+        cudaStreamDestroy(streams[i]);
+    }
     cudaFree(d_avg);
     cudaFree(d_cov);
     free(h_cov);
