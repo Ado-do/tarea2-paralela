@@ -10,8 +10,9 @@ RESULTS_EXP2="./data/exp2_benchmark_results.csv"
 # Configuración de variables
 NUM_IMAGES=100
 BATCH_SIZES_EXP1=(16 32 64 100)     # Para Experimento 1
-BATCH_SIZE_EXP2=8                   # Lote fijo para Experimento 2 (100 imagenes / 8 batches ~ 16 streams)
+BATCH_SIZE_EXP2=8                   # Lote fijo para Experimento 2
 STREAMS_EXP2=(1 2 4 8 16)           # Streams a evaluar en Experimento 2
+NUM_RUNS=20                         # Iteraciones para validación estadística
 
 echo "[INFO] Comenzando benchmarking..."
 
@@ -30,13 +31,13 @@ for size in "${BATCH_SIZES_EXP1[@]}"; do
     echo "----------------------------------------"
     echo "[INFO] Procesando tamaño de batch: $size"
     
-    # Conseguimos métricas de tiempo
-    echo "       -> Recolectando métricas de ejecución..."
-    # Parámetros: <exp_id=1> <num_images> <batch_size> <num_streams=1>
-    $BIN 1 $NUM_IMAGES $size 1 > temp_output.txt
-    grep "\[METRICAS\]," temp_output.txt | sed 's/\[METRICAS\],//' >> $RESULTS_EXP1
+    # Conseguimos métricas de tiempo (NUM_RUNS ejecuciones)
+    echo "       -> Recolectando métricas de ejecución ($NUM_RUNS iteraciones)..."
+    for i in $(seq 1 $NUM_RUNS); do
+        $BIN 1 $NUM_IMAGES $size 1 | grep "\[METRICAS\]," | sed 's/\[METRICAS\],//' >> $RESULTS_EXP1
+    done
     
-    # Profiling, se corre aparte
+    # Profiling, se corre aparte (1 sola ejecución para visualización)
     echo "       -> Generando nsys trace..."
     nsys profile \
         --trace=cuda,osrt \
@@ -45,7 +46,7 @@ for size in "${BATCH_SIZES_EXP1[@]}"; do
         -o "./data/exp1_profile_batch${size}" \
         $BIN 1 $NUM_IMAGES $size 1 > /dev/null 2>&1
 
-    echo "       -> Trace guardada como exp1_profile_batch${size}.nsys-rep"
+    echo "       -> Trace guardada como ./data/exp1_profile_batch${size}.nsys-rep"
 done
 
 echo "========================================"
@@ -55,13 +56,13 @@ for s in "${STREAMS_EXP2[@]}"; do
     echo "----------------------------------------"
     echo "[INFO] Procesando con $s Streams..."
     
-    # Conseguimos métricas de tiempo
-    echo "       -> Recolectando métricas de ejecución..."
-    # Parámetros: <exp_id=2> <num_images> <batch_size> <num_streams=s>
-    $BIN 2 $NUM_IMAGES $BATCH_SIZE_EXP2 $s > temp_output.txt
-    grep "\[METRICAS_EXP2\]," temp_output.txt | sed 's/\[METRICAS_EXP2\],//' >> $RESULTS_EXP2
+    # Conseguimos métricas de tiempo (NUM_RUNS ejecuciones)
+    echo "       -> Recolectando métricas de ejecución ($NUM_RUNS iteraciones)..."
+    for i in $(seq 1 $NUM_RUNS); do
+        $BIN 2 $NUM_IMAGES $BATCH_SIZE_EXP2 $s | grep "\[METRICAS_EXP2\]," | sed 's/\[METRICAS_EXP2\],//' >> $RESULTS_EXP2
+    done
     
-    # Profiling, se corre aparte
+    # Profiling, se corre aparte (1 sola ejecución para visualización)
     echo "       -> Generando nsys trace..."
     nsys profile \
         --trace=cuda,osrt \
@@ -69,11 +70,8 @@ for s in "${STREAMS_EXP2[@]}"; do
         --export=sqlite -o "./data/exp2_profile_streams${s}" \
         $BIN 2 $NUM_IMAGES $BATCH_SIZE_EXP2 $s > /dev/null 2>&1
     
-    echo "       -> Trace guardada como exp2_profile_batch${size}.nsys-rep"
+    echo "       -> Trace guardada como ./data/exp2_profile_streams${s}.nsys-rep"
 done
 
-# Limpieza del archivo temporal
-rm temp_output.txt
-
 echo "----------------------------------------"
-echo "[INFO] Benchmarking completo. Resultados en carpeta data"
+echo "[INFO] Benchmarking completo. Resultados listos en carpeta ./data"
