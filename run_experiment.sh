@@ -32,7 +32,7 @@ for size in "${BATCH_SIZES[@]}"; do
         --force-overwrite=true \
         --export=sqlite \
         -o "profile_exp1_batch${size}" \
-        $BINARY $size
+        $BIN $size > /dev/null 2>&1
 
     echo "       -> Trace guardada como profile_exp1_batch${size}.nsys-rep"
 done
