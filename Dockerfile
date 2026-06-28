@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y \
     libx11-dev \
     libjpeg-dev \
     libpng-dev \
-    wget \
     git \
+    cuda-nsight-systems-12-2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace

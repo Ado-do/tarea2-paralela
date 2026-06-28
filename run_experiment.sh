@@ -4,7 +4,7 @@ set -e
 
 # Configuration
 BIN="./bin/benchmark"
-RESULTS_FILE="benchmark_results.csv"
+RESULTS_FILE="./data/benchmark_results.csv"
 BATCH_SIZES=(16 32 64 100) # Máximo 100
 
 echo "[INFO] Comenzando benchmarking..."
@@ -32,7 +32,7 @@ for size in "${BATCH_SIZES[@]}"; do
         --force-overwrite=true \
         --export=sqlite \
         -o "profile_exp1_batch${size}" \
-        $BINARY $size > /dev/null 2>&1
+        $BINARY $size
 
     echo "       -> Trace guardada como profile_exp1_batch${size}.nsys-rep"
 done
