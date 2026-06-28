@@ -1,6 +1,7 @@
 #include <iostream>
 #include <exception>
 #include <vector>
+#include <string>
 #include "../inc/dataloader.hpp"
 #include "../inc/kernels.cuh"
 
@@ -9,11 +10,17 @@ using namespace std;
 int main (int argc, char *argv[]) {
     cout << "* BENCHMARK Y PRUEBAS FINALES\n";
 
-    // Default es 100
+    // Valores por defecto
+    int exp_id = 1; 
     int target_num_images = 100; 
-    if (argc > 1) {
-        target_num_images = std::stoi(argv[1]);
-    }
+    int batch_size = 25;
+    int num_streams = 4;
+
+    // Leer parámetros: ./benchmark <exp_id> <num_images> <batch_size> <num_streams>
+    if (argc > 1) exp_id = std::stoi(argv[1]);
+    if (argc > 2) target_num_images = std::stoi(argv[2]);
+    if (argc > 3) batch_size = std::stoi(argv[3]);
+    if (argc > 4) num_streams = std::stoi(argv[4]);
 
     const string dataset_dir = "data/DIV2K_valid_LR_bicubic_X4";
     const int target_width = 128;
@@ -35,13 +42,18 @@ int main (int argc, char *argv[]) {
             return 1;
         }
 
-        // Experimento 1: CUDA clásico sincrónico
-        cout << ">>> Ejecutando Experimento 1..." << endl;
-        run_experiment_1(batch_ptr, target_num_images, n, false);
-
-        // TODO: Agregar experimento 2
-        // cout << ">>> Ejecutando Experimento 2..." << endl;
-        // run_experiment_2(batch_ptr, target_num_images, n, false);
+        // Switch de control de experimentos
+        if (exp_id == 1) {
+            cout << ">>> Ejecutando Experimento 1..." << endl;
+            run_experiment_1(batch_ptr, target_num_images, n, false);
+        } else if (exp_id == 2) {
+            cout << "\n>>> Ejecutando Experimento 2 (Streams: " << num_streams 
+            << ", Batch: " << batch_size << ")" << endl;
+            run_experiment_2(batch_ptr, target_num_images, n, batch_size, num_streams, false);
+        } else {
+            cerr << "[ERROR] ID de experimento desconocido." << endl;
+            return 1;
+        }
 
         cout << "\n========================================\n";
         cout << "[INFO] Benchmark completado exitosamente." << endl;

@@ -34,6 +34,14 @@ int main (int argc, char *argv[]) {
         
         // Pasamos true para check_correctness
         run_experiment_1(batch_ptr, num_images, n, true);
+
+        int batch_size = 4;
+        int num_streams = 4;
+
+        cout << "[INFO] Ejecutando Experimento 2 con verificación en CPU..." << endl;
+
+        // Pasamos true para check_correctness
+        run_experiment_2(batch_ptr, num_images, n, batch_size, num_streams, true);
         
         cout << "\n[INFO] Pruebas de correctitud finalizadas." << endl;
 
