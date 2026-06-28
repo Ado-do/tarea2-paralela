@@ -6,6 +6,7 @@ set -e
 BIN="./bin/benchmark"
 RESULTS_FILE="./data/exp1_benchmark_results.csv"
 BATCH_SIZES=(16 32 64 100) # Máximo 100
+NUM_RUNS=20 # Iteraciones para validación estadística
 
 echo "[INFO] Comenzando benchmarking..."
 
@@ -20,11 +21,13 @@ for size in "${BATCH_SIZES[@]}"; do
     echo "----------------------------------------"
     echo "[INFO] Procesando tamaño de batch: $size"
 
-    # Conseguimos métricas de tiempo
-    echo "       -> Recolectando métricas de ejecución..."
-    $BIN $size | grep "\[METRICAS\]" | sed 's/\[METRICAS\],//' >> $RESULTS_FILE
+    # Conseguimos métricas de tiempo (NUM_RUNS ejecuciones)
+    echo "       -> Recolectando métricas de ejecución ($NUM_RUNS iteraciones)..."
+    for i in $(seq 1 $NUM_RUNS); do
+        $BIN $size | grep "\[METRICAS\]" | sed 's/\[METRICAS\],//' >> $RESULTS_FILE
+    done
 
-    # Profiling, se corre aparte
+    # Profiling, se corre aparte (1 sola ejecución para visualización)
     echo "       -> Generando nsys trace..."
     nsys profile \
         --trace=cuda,osrt \
@@ -33,8 +36,8 @@ for size in "${BATCH_SIZES[@]}"; do
         -o "./data/exp1_profile_batch${size}" \
         $BIN $size > /dev/null 2>&1
 
-    echo "       -> Trace guardada como profile_exp1_batch${size}.nsys-rep"
+    echo "       -> Trace guardada como ./data/exp1_profile_batch${size}.nsys-rep"
 done
 
 echo "----------------------------------------"
-echo "[INFO] Benchmarking completo. Resultados en $RESULTS_FILE"
+echo "[INFO] Benchmarking completo. Resultados listos para Python en $RESULTS_FILE"
