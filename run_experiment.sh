@@ -22,7 +22,7 @@ for size in "${BATCH_SIZES[@]}"; do
 
     # Conseguimos métricas de tiempo
     echo "       -> Recolectando métricas de ejecución..."
-    $BINARY $size | grep "\[METRICAS\]" | sed 's/\[METRICAS\],//' >> $RESULTS_FILE
+    $BIN $size | grep "\[METRICAS\]" | sed 's/\[METRICAS\],//' >> $RESULTS_FILE
 
     # Profiling, se corre aparte
     echo "       -> Generando nsys trace..."
