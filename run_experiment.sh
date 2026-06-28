@@ -4,7 +4,7 @@ set -e
 
 # Configuration
 BIN="./bin/benchmark"
-RESULTS_FILE="./data/benchmark_results.csv"
+RESULTS_FILE="./data/exp1_benchmark_results.csv"
 BATCH_SIZES=(16 32 64 100) # Máximo 100
 
 echo "[INFO] Comenzando benchmarking..."
@@ -26,12 +26,11 @@ for size in "${BATCH_SIZES[@]}"; do
 
     # Profiling, se corre aparte
     echo "       -> Generando nsys trace..."
-    # Run nsys quietly, dumping the artifact to the workspace
     nsys profile \
         --trace=cuda,osrt \
         --force-overwrite=true \
         --export=sqlite \
-        -o "profile_exp1_batch${size}" \
+        -o "./data/exp1_profile_batch${size}" \
         $BIN $size > /dev/null 2>&1
 
     echo "       -> Trace guardada como profile_exp1_batch${size}.nsys-rep"
