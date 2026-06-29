@@ -8,9 +8,9 @@ RESULTS_EXP1="./data/exp1_benchmark_results.csv"
 RESULTS_EXP2="./data/exp2_benchmark_results.csv"
 
 # Configuración de variables
-NUM_IMAGES=2048
+NUM_IMAGES=65536
 BATCH_SIZES_EXP1=(256 512 1024 2048)     # Para Experimento 1
-BATCH_SIZE_EXP2=128                   # Lote fijo para Experimento 2
+BATCH_SIZE_EXP2=1024                   # Lote fijo para Experimento 2
 STREAMS_EXP2=(1 2 4 8 16)           # Streams a evaluar en Experimento 2
 NUM_RUNS=20                         # Iteraciones para validación estadística
 
