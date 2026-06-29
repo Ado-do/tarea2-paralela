@@ -34,7 +34,7 @@ for size in "${BATCH_SIZES_EXP1[@]}"; do
     # Conseguimos métricas de tiempo (NUM_RUNS ejecuciones)
     echo "       -> Recolectando métricas de ejecución ($NUM_RUNS iteraciones)..."
     for i in $(seq 1 $NUM_RUNS); do
-        $BIN 1 $NUM_IMAGES $size 1 | grep "\[METRICAS\]," | sed 's/\[METRICAS\],//' >> $RESULTS_EXP1
+        $BIN 1 $size $size 1 | grep "\[METRICAS\]," | sed 's/\[METRICAS\],//' >> $RESULTS_EXP1
     done
     
     # Profiling, se corre aparte (1 sola ejecución para visualización)
@@ -44,7 +44,7 @@ for size in "${BATCH_SIZES_EXP1[@]}"; do
         --force-overwrite=true \
         --export=sqlite \
         -o "./data/exp1_profile_batch${size}" \
-        $BIN 1 $NUM_IMAGES $size 1 > /dev/null 2>&1
+        $BIN 1 $size $size 1 > /dev/null 2>&1
 
     echo "       -> Trace guardada como ./data/exp1_profile_batch${size}.nsys-rep"
 done
