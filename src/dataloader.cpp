@@ -60,7 +60,8 @@ void DataLoader::preprocess_data() {
 
 float* DataLoader::get_batch_pointer(int batch_index, int batch_size) const {
     size_t offset = static_cast<size_t>(batch_index) * batch_size * elements_per_image;
-    if (offset >= total_elements) {
+    size_t required = static_cast<size_t>(batch_size) * elements_per_image;
+    if (offset + required >= total_elements) {
         return nullptr;
     }
     return h_dataset + offset;
