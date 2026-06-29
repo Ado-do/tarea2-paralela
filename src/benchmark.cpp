@@ -28,7 +28,7 @@ int main (int argc, char *argv[]) {
 
     try {
         cout << "[INFO] Inicializando DataLoader global para el benchmark..." << endl;
-        DataLoader loader(100, dataset_dir, target_width, target_height);
+        DataLoader loader(target_num_images, dataset_dir, target_width, target_height);
         loader.preprocess_data();
         
         int n = loader.get_elements_per_image();
