@@ -54,15 +54,17 @@ __global__ void compute_covariance_tiled_kernel(float* d_dataset, float* d_cov,
     // Iteramos sobre los lotes de tamaño TILE_SIZE en la dimensión 'num_images'
     int num_tiles = (num_images + TILE_SIZE - 1) / TILE_SIZE;
     for (int m_step = 0; m_step < num_tiles; ++m_step) {
-        __shared__ float s_A[TILE_SIZE][TILE_SIZE];
+        // Añadimos +1 para evitar bank conflicts al escribir transpuesta
+        __shared__ float s_A[TILE_SIZE][TILE_SIZE + 1];
         __shared__ float s_B[TILE_SIZE][TILE_SIZE];
 
-        // Cargar tile de A (V) a memoria compartida
-        int k_A = m_step * TILE_SIZE + tx; // columna en A (índice de imagen k)
-        if (row < n && k_A < num_images) {
-            s_A[ty][tx] = d_dataset[k_A * n + row];
+        // Cargar tile de A (V) a memoria compartida de forma coalescente
+        int load_k_A = m_step * TILE_SIZE + ty; // fila en la matriz lógica, mapeado a ty
+        int load_row_A = blockIdx.y * TILE_SIZE + tx; // componente, mapeado a tx contiguo
+        if (load_row_A < n && load_k_A < num_images) {
+            s_A[tx][ty] = d_dataset[load_k_A * n + load_row_A];
         } else {
-            s_A[ty][tx] = 0.0f;
+            s_A[tx][ty] = 0.0f;
         }
 
         // Cargar tile de B (V^T) a memoria compartida
@@ -126,14 +128,17 @@ __global__ void accumulate_covariance_tiled_kernel(float* d_dataset_batch, float
     int num_tiles = (batch_images + TILE_SIZE - 1) / TILE_SIZE;
 
     for (int m_step = 0; m_step < num_tiles; ++m_step) {
-        __shared__ float s_A[TILE_SIZE][TILE_SIZE];
+        // Añadimos +1 para evitar bank conflicts al escribir transpuesta
+        __shared__ float s_A[TILE_SIZE][TILE_SIZE + 1];
         __shared__ float s_B[TILE_SIZE][TILE_SIZE];
 
-        int k_A = m_step * TILE_SIZE + tx; 
-        if (row < n && k_A < batch_images) {
-            s_A[ty][tx] = d_dataset_batch[k_A * n + row];
+        // Cargar tile de A a memoria compartida de forma coalescente
+        int load_k_A = m_step * TILE_SIZE + ty; 
+        int load_row_A = blockIdx.y * TILE_SIZE + tx;
+        if (load_row_A < n && load_k_A < batch_images) {
+            s_A[tx][ty] = d_dataset_batch[load_k_A * n + load_row_A];
         } else {
-            s_A[ty][tx] = 0.0f;
+            s_A[tx][ty] = 0.0f;
         }
 
         int k_B = m_step * TILE_SIZE + ty; 
